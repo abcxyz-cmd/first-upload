@@ -1,0 +1,148 @@
+Here are the updates you need to make:
+
+Create a template for highlighting
+
+Create a new template called highlighted_excel_file.html in the templates directory:
+
+<!-- templates/highlighted_excel_file.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Highlighted Excel File</h1>
+    <table>
+        <tr>
+            {% for column in columns %}
+                <th>{{ column }}</th>
+            {% endfor %}
+        </tr>
+        {% for row in highlighted_df %}
+            <tr>
+                {% for value in row %}
+                    <td>{{ value }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock %}
+
+This template will display the highlighted Excel file data in a table.
+
+Add filter and highlight options to the navbar
+
+Update the base.html template to add the filter and highlight options to the navbar:
+
+<!-- templates/base.html -->
+
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <a class="navbar-brand" href="{% url 'excel_file_list' %}">Excel Viewer</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'upload_excel_file' %}">Upload Excel File</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'excel_file_list' %}">Excel File List</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'filter_excel_file' pk %}">Filter</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'highlight_matching_values' pk %}">Highlight</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+Add a highlight button to the filter template
+
+Update the filter_excel_file.html template to add a highlight button:
+
+<!-- templates/filter_excel_file.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Filter Excel File</h1>
+    <form method="post">
+        {% csrf_token %}
+        {% for column in columns %}
+            <input type="checkbox" name="columns" value="{{ column }}">{{ column }}
+        {% endfor %}
+        <button type="submit">Filter</button>
+        <button type="submit" formaction="{% url 'highlight_matching_values' pk %}">Highlight</button>
+    </form>
+{% endblock %}
+
+This will add a highlight button to the filter form.
+
+Update the highlight view function
+
+Update the highlight_matching_values view function to render the highlighted_excel_file.html template:
+
+def highlight_matching_values(request, pk):
+    excel_file = ExcelFile.objects.get(pk=pk)
+    df = pd.read_excel(excel_file.file.path)
+    columns = df.columns.tolist()
+    if request.method == 'POST':
+        column1 = request.POST.get('column1')
+        column2 = request.POST.get('column2')
+        value1 = request.POST.get('value1')
+        value2 = request.POST.get('value2')
+        highlighted_df = df[(df[column1] == value1) & (df[column2] == value2)]
+        return render(request, 'highlighted_excel_file.html', {'highlighted_df': highlighted_df.values.tolist(), 'columns': columns})
+    return render(request, 'highlight_matching_values.html', {'columns': columns})
+
+This view function will render the highlighted_excel_file.html template with the highlighted data when the user submits the highlight form.
+
+I hope this helps! Let me know if you have any further issues.
+
+the highlight_matching_values functions should be able to highlight as many columns as desied
+
+In that case, we need to modify the highlight_matching_values function to accept a variable number of columns and values.
+
+Here's an updated version of the function:
+
+def highlight_matching_values(request, pk):
+    excel_file = ExcelFile.objects.get(pk=pk)
+    df = pd.read_excel(excel_file.file.path)
+    columns = df.columns.tolist()
+    if request.method == 'POST':
+        selected_columns = request.POST.getlist('columns')
+        values = request.POST.getlist('values')
+        conditions = [(df[col] == val) for col, val in zip(selected_columns, values)]
+        highlighted_df = df
+        for condition in conditions:
+            highlighted_df = highlighted_df[condition]
+        return render(request, 'highlighted_excel_file.html', {'highlighted_df': highlighted_df.values.tolist(), 'columns': columns})
+    return render(request, 'highlight_matching_values.html', {'columns': columns})
+
+In this updated function, we use the request.POST.getlist method to get a list of selected columns and values. We then create a list of conditions using a list comprehension, where each condition is a boolean series indicating which rows match the specified value in the corresponding column.
+
+We then apply these conditions to the dataframe using a loop, and finally render the highlighted_excel_file.html template with the highlighted data.
+
+To make this work, we also need to update the highlight_matching_values.html template to allow the user to select multiple columns and values:
+
+<!-- templates/highlight_matching_values.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Highlight Matching Values</h1>
+    <form method="post">
+        {% csrf_token %}
+        {% for column in columns %}
+            <input type="checkbox" name="columns" value="{{ column }}">{{ column }}
+            <input type="text" name="values" value="">
+
+        {% endfor %}
+        <button type="submit">Highlight</button>
+    </form>
+{% endblock %}
+
+In this updated template, we use a loop to create a checkbox and text input for each column. The user can select the columns they want to highlight and enter the corresponding values.
+
+I hope this helps! Let me know if you have any further issues.
