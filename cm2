@@ -1,0 +1,115 @@
+Here's an example of how you can add a navbar to your Django app:
+
+Create a base template
+
+Create a new file called base.html in your templates directory:
+
+<!-- templates/base.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Excel Viewer</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f5f5f5;
+        }
+       .navbar {
+            background-color: #333;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <a class="navbar-brand" href="{% url 'excel_file_list' %}">Excel Viewer</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'upload_excel_file' %}">Upload Excel File</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'excel_file_list' %}">Excel File List</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
+
+This template uses Bootstrap 4 to create a dark navbar with two links: "Upload Excel File" and "Excel File List".
+
+Extend the base template in your other templates
+
+Update your other templates to extend the base.html template:
+
+<!-- templates/upload_excel_file.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Upload Excel File</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="file">
+        <button type="submit">Upload</button>
+    </form>
+{% endblock %}
+
+<!-- templates/excel_file_list.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Excel File List</h1>
+    <ul>
+        {% for excel_file in page_obj %}
+            <li>
+                <a href="{% url 'view_excel_file' excel_file.pk %}">{{ excel_file.file.name }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+    {% if page_obj.has_previous %}
+        <a href="{% url 'excel_file_list' %}?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+    {% if page_obj.has_next %}
+        <a href="{% url 'excel_file_list' %}?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+{% endblock %}
+
+<!-- templates/view_excel_file.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>View Excel File</h1>
+    <table>
+        <tr>
+            {% for column in columns %}
+                <th>{{ column }}</th>
+            {% endfor %}
+        </tr>
+        {% for row in page_obj %}
+            <tr>
+                {% for value in row %}
+                    <td>{{ value }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+    {% if page_obj.has_previous %}
+        <a href="{% url 'view_excel_file' pk %}?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+    {% if page_obj.has_next %}
+        <a href="{% url 'view_excel_file' pk %}?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+{% endblock %}
