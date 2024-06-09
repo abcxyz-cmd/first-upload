@@ -1,0 +1,54 @@
+Let's create a new template called filtered_excel_file.html in the templates directory:
+
+<!-- templates/filtered_excel_file.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Filtered Excel File</h1>
+    <table>
+        <tr>
+            {% for column in columns %}
+                <th>{{ column }}</th>
+            {% endfor %}
+        </tr>
+        {% for row in filtered_df %}
+            <tr>
+                {% for value in row %}
+                    <td>{{ value }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock %}
+
+This template will display the filtered Excel file data in a table.
+
+Next, update the filter_excel_file view function to render this new template:
+
+def filter_excel_file(request, pk):
+    excel_file = ExcelFile.objects.get(pk=pk)
+    df = pd.read_excel(excel_file.file.path)
+    columns = df.columns.tolist()
+    if request.method == 'POST':
+        filtered_columns = request.POST.getlist('columns')
+        filtered_df = df[filtered_columns]
+        return render(request, 'filtered_excel_file.html', {'filtered_df': filtered_df.values.tolist(), 'columns': filtered_columns})
+    return render(request, 'filter_excel_file.html', {'columns': columns})
+
+This view function will render the filtered_excel_file.html template with the filtered data when the user submits the filter form.
+
+Make sure to update the urls.py file to include the new template:
+
+# urls.py
+
+from django.urls import path
+from. import views
+
+urlpatterns = [
+    #...
+    path('filter/<pk>/', views.filter_excel_file, name='filter_excel_file'),
+    #...
+]
+
+With these changes, you should now be able to see the filtered files after applying filters.
