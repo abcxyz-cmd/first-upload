@@ -1,0 +1,22 @@
+<!-- templates/excel_file_list.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Excel File List</h1>
+    <ul>
+        {% for excel_file in page_obj %}
+            <li>
+                <a href="{% url 'view_excel_file' excel_file.pk %}">{{ excel_file.file.name }}</a>
+                <a class="nav-link" href="{% url 'filter_excel_file' pk=excel_file.pk %}">Filter</a>
+            </li>
+        {% endfor %}
+    </ul>
+    {% if page_obj.has_previous %}
+        <a href="{% url 'excel_file_list' %}?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+    {% if page_obj.has_next %}
+        <a href="{% url 'excel_file_list' %}?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+{% endblock %}
