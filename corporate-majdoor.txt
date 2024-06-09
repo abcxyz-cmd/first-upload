@@ -1,0 +1,189 @@
+Here is an example of how you can create a Django web app that meets your requirements:
+
+models.py
+
+from django.db import models
+
+class ExcelFile(models.Model):
+    file = models.FileField(upload_to='excel_files/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+views.py
+
+import pandas as pd
+from django.shortcuts import render, redirect
+from django.core.paginator import Paginator
+from.models import ExcelFile
+
+def upload_excel_file(request):
+    if request.method == 'POST':
+        excel_file = ExcelFile(file=request.FILES['file'])
+        excel_file.save()
+        return redirect('excel_file_list')
+    return render(request, 'upload_excel_file.html')
+
+def excel_file_list(request):
+    excel_files = ExcelFile.objects.all()
+    paginator = Paginator(excel_files, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'excel_file_list.html', {'page_obj': page_obj})
+
+def view_excel_file(request, pk):
+    excel_file = ExcelFile.objects.get(pk=pk)
+    df = pd.read_excel(excel_file.file.path)
+    paginator = Paginator(df.values.tolist(), 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'view_excel_file.html', {'page_obj': page_obj, 'columns': df.columns.tolist()})
+
+def filter_excel_file(request, pk):
+    excel_file = ExcelFile.objects.get(pk=pk)
+    df = pd.read_excel(excel_file.file.path)
+    columns = df.columns.tolist()
+    if request.method == 'POST':
+        filtered_columns = request.POST.getlist('columns')
+        filtered_df = df[filtered_columns]
+        return render(request, 'filtered_excel_file.html', {'filtered_df': filtered_df.values.tolist(), 'columns': filtered_columns})
+    return render(request, 'filter_excel_file.html', {'columns': columns})
+
+def highlight_matching_values(request, pk):
+    excel_file = ExcelFile.objects.get(pk=pk)
+    df = pd.read_excel(excel_file.file.path)
+    columns = df.columns.tolist()
+    if request.method == 'POST':
+        column1 = request.POST.get('column1')
+        column2 = request.POST.get('column2')
+        value1 = request.POST.get('value1')
+        value2 = request.POST.get('value2')
+        highlighted_df = df[(df[column1] == value1) & (df[column2] == value2)]
+        return render(request, 'highlighted_excel_file.html', {'highlighted_df': highlighted_df.values.tolist(), 'columns': columns})
+    return render(request, 'highlight_matching_values.html', {'columns': columns})
+
+templates/upload_excel_file.html
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="file">
+    <button type="submit">Upload</button>
+</form>
+
+templates/excel_file_list.html
+
+{% for excel_file in page_obj %}
+    <p>{{ excel_file.file.name }}</p>
+    <a href="{% url 'view_excel_file' excel_file.pk %}">View</a>
+{% endfor %}
+
+{% if page_obj.has_previous %}
+    <a href="{% url 'excel_file_list' %}?page={{ page_obj.previous_page_number }}">Previous</a>
+{% endif %}
+
+Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+
+{% if page_obj.has_next %}
+    <a href="{% url 'excel_file_list' %}?page={{ page_obj.next_page_number }}">Next</a>
+{% endif %}
+
+templates/view_excel_file.html
+
+<table>
+    <tr>
+        {% for column in columns %}
+            <th>{{ column }}</th>
+        {% endfor %}
+    </tr>
+    {% for row in page_obj %}
+        <tr>
+            {% for value in row %}
+                <td>{{ value }}</td>
+            {% endfor %}
+        </tr>
+    {% endfor %}
+</table>
+
+{% if page_obj.has_previous %}
+    <a href="{% url 'view_excel_file' pk %}?page={{ page_obj.previous_page_number }}">Previous</a>
+{% endif %}
+
+Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+
+{% if page_obj.has_next %}
+    <a href="{% url 'view_excel_file' pk %}?page={{ page_obj.next_page_number }}">Next</a>
+{% endif %}
+
+templates/filter_excel_file.html
+
+<form method="post">
+    {% csrf_token %}
+    {% for column in columns %}
+        <input type="checkbox" name="columns" value="{{ column }}">{{ column }}
+    {% endfor %}
+    <button type="submit">Filter</button>
+</form>
+
+templates/filtered_excel_file.html
+
+<table>
+    <tr>
+        {% for column in columns %}
+            <th>{{ column }}</th>
+        {% endfor %}
+    </tr>
+    {% for row in filtered_df %}
+        <tr>
+            {% for value in row %}
+                <td>{{ value }}</td>
+            {% endfor %}
+        </tr>
+    {% endfor %}
+</table>
+
+templates/highlight_matching_values.html
+
+<form method="post">
+    {% csrf_token %}
+    <select name="column1">
+        {% for column in columns %}
+            <option value="{{ column }}">{{ column }}</option>
+        {% endfor %}
+    </select>
+    <select name="column2">
+        {% for column in columns %}
+            <option value="{{ column }}">{{ column }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="value1">
+    <input type="text" name="value2">
+    <button type="submit">Highlight</button>
+</form>
+
+templates/highlighted_excel_file.html
+
+<table>
+    <tr>
+        {% for column in columns %}
+            <th>{{ column }}</th>
+        {% endfor %}
+    </tr>
+    {% for row in highlighted_df %}
+        <tr>
+            {% for value in row %}
+                <td>{{ value }}</td>
+            {% endfor %}
+        </tr>
+    {% endfor %}
+</table>
+
+urls.py
+
+from django.urls import path
+from. import views
+
+urlpatterns = [
+    path('upload/', views.upload_excel_file, name='upload_excel_file'),
+    path('list/', views.excel_file_list, name='excel_file_list'),
+    path('view/<pk>/', views.view_excel_file, name='view_excel_file'),
+    path('filter/<pk>/', views.filter_excel_file, name='filter_excel_file'),
+    path('highlight/<pk>/', views.highlight_matching_values, name='highlight_matching_values'),
+]
