@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>Filtered Data</h1>
+  <table>
+    <thead>
+      <tr>
+        {% for column in columns %}
+          <th>{{ column }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in page_obj %}
+        <tr>
+          {% for cell in row %}
+            <td>{{ cell|default:'' }}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button onclick="location.href='{% url 'highlight_matching_values' %}?{{ request.GET.urlencode }}'">Highlight Matching Values</button>
+  {% if highlighted_df_list %}
+    <table>
+      <thead>
+        <tr>
+          {% for column in columns %}
+            <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in highlighted_df_list %}
+          <tr>
+            {% with column_list=request.GET.get('columns', '').split(',') %}
+              {% for cell in row %}
+                <td{% if cell in column_list %} style="background-color: yellow"{% endif %}>{{ cell|default:'' }}</td>
+              {% endfor %}
+            {% endwith %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <div class="pagination">
+    <span class="page-links">
+      {% if page_obj.has_previous %}
+        <a href="{% url 'filter_data' %}?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">previous</a>
+      {% endif %}
+      <span class="current">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+      </span>
+      {% if page_obj.has_next %}
+        <a href="{% url 'filter_data' %}?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">next</a>
+      {% endif %}
+    </span>
+  </div>
+{% endblock %}
