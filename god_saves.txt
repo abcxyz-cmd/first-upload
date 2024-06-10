@@ -1,0 +1,69 @@
+def highlight_matching_values(request):
+    uploaded_file = UploadedFile.objects.latest('uploaded_at')
+    df = pd.read_excel(uploaded_file.file.path)
+    columns = df.columns.tolist()
+    filtered_columns = request.GET.getlist('columns')
+    filtered_df = df[filtered_columns]
+    highlighted_df = filtered_df.apply(lambda x: ['background-color: yellow' if x.name in filtered_columns else '' for _ in x], axis=0)
+    highlighted_df_list = highlighted_df.values.tolist()
+    return render(request, 'highlight.html', {'highlighted_df_list': highlighted_df_list, 'columns': filtered_columns})
+
+templates/highlight.html:
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Filtered Data</h1>
+  <table>
+    <thead>
+      <tr>
+        {% for column in columns %}
+          <th>{{ column }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in page_obj %}
+        <tr>
+          {% for cell in row %}
+            <td>{{ cell|default:'' }}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button onclick="location.href='{% url 'highlight_matching_values' %}?{{ request.GET.urlencode }}'">Highlight Matching Values</button>
+  {% if highlighted_df_list %}
+    <table>
+      <thead>
+        <tr>
+          {% for column in columns %}
+            <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in highlighted_df_list %}
+          <tr>
+            {% for cell in row %}
+              <td style="{% if forloop.parentloop.counter0 < highlighted_df_list|length|add:-1 %}background-color: yellow{% endif %}">{{ cell|default:'' }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <div class="pagination">
+    <span class="page-links">
+      {% if page_obj.has_previous %}
+        <a href="{% url 'filter_data' %}?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">previous</a>
+      {% endif %}
+      <span class="current">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+      </span>
+      {% if page_obj.has_next %}
+        <a href="{% url 'filter_data' %}?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">next</a>
+      {% endif %}
+    </span>
+  </div>
+{% endblock %}
