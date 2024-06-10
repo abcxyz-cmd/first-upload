@@ -1,0 +1,187 @@
+models.py:
+
+from django.db import models
+
+class UploadedFile(models.Model):
+    file = models.FileField(upload_to='uploads/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+forms.py:
+
+from django import forms
+from.models import UploadedFile
+
+class UploadFileForm(forms.ModelForm):
+    class Meta:
+        model = UploadedFile
+        fields = ('file',)
+
+views.py:
+
+import pandas as pd
+from django.shortcuts import render, redirect
+from django.core.paginator import Paginator
+from.forms import UploadFileForm
+from.models import UploadedFile
+
+def upload_file(request):
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('filter_view')
+    else:
+        form = UploadFileForm()
+    return render(request, 'upload.html', {'form': form})
+
+def filter_view(request):
+    uploaded_file = UploadedFile.objects.latest('uploaded_at')
+    df = pd.read_excel(uploaded_file.file.path)
+    columns = df.columns.tolist()
+    return render(request, 'filter.html', {'columns': columns})
+
+def filter_data(request):
+    uploaded_file = UploadedFile.objects.latest('uploaded_at')
+    df = pd.read_excel(uploaded_file.file.path)
+    columns = df.columns.tolist()
+    filtered_columns = request.GET.getlist('columns')
+    filtered_df = df[filtered_columns]
+    paginator = Paginator(filtered_df.to_records(index=False), 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'highlight.html', {'page_obj': page_obj, 'columns': filtered_columns})
+
+def highlight_matching_values(request):
+    uploaded_file = UploadedFile.objects.latest('uploaded_at')
+    df = pd.read_excel(uploaded_file.file.path)
+    columns = df.columns.tolist()
+    filtered_columns = request.GET.getlist('columns')
+    filtered_df = df[filtered_columns]
+    highlighted_df = filtered_df.style.apply(lambda x: ['background-color: yellow' if x.name in filtered_columns else '' for _ in x])
+    return render(request, 'highlight.html', {'highlighted_df': highlighted_df, 'columns': filtered_columns})
+
+templates/base.html:
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="#">Excel Viewer</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item active">
+        <a class="nav-link" href="{% url 'upload_file' %}">Upload File <span class="sr-only">(current)</span></a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'filter_view' %}">Filter</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+templates/upload.html:
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Upload Excel File</h1>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Upload</button>
+  </form>
+{% endblock %}
+
+templates/filter.html:
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Filter Columns</h1>
+  <form action="{% url 'filter_data' %}" method="get">
+    {% csrf_token %}
+    <ul>
+      {% for column in columns %}
+        <li><input type="checkbox" name="columns" value="{{ column }}"> {{ column }}</li>
+      {% endfor %}
+    </ul>
+    <button type="submit">Filter</button>
+  </form>
+{% endblock %}
+
+templates/highlight.html:
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>Filtered Data</h1>
+  <table>
+    <thead>
+      <tr>
+        {% for column in columns %}
+          <th>{{ column }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in page_obj %}
+        <tr>
+          {% for cell in row %}
+            <td>{{ cell }}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button onclick="location.href='{% url 'highlight_matching_values' %}?{{ request.GET.urlencode }}'">Highlight Matching Values</button>
+  {% if highlighted_df %}
+    <table>
+      <thead>
+        <tr>
+          {% for column in columns %}
+            <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in highlighted_df.itertuples(index=False) %}
+          <tr>
+            {% for cell in row %}
+              <td style="{{ cell }}">{{ cell }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <div class="pagination">
+    <span class="page-links">
+      {% if page_obj.has_previous %}
+        <a href="{% url 'filter_data' %}?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">previous</a>
+      {% endif %}
+      <span class="current">
+        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+      </span>
+      {% if page_obj.has_next %}
+        <a href="{% url 'filter_data' %}?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">next</a>
+      {% endif %}
+    </span>
+  </div>
+{% endblock %}
+
+urls.py:
+
+from django.urls import path
+from. import views
+
+urlpatterns = [
+    path('upload/', views.upload_file, name='upload_file'),
+    path('filter/', views.filter_view, name='filter_view'),
+    path('filter/data/', views.filter_data, name='filter_data'),
+    path('filter/highlight/', views.highlight_matching_values, name='highlight_matching_values'),
+]
