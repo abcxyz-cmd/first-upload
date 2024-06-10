@@ -1,0 +1,191 @@
+Create templates for file upload, displaying results, and the navbar.
+Step 1: Set Up Django Project
+Run the following commands to create a new Django project and app:
+
+bashCopy code
+django-admin startproject myproject
+cd myproject
+python manage.py startapp excelapp
+
+Step 2: Install Required Packages
+Install openpyxl and django-bootstrap4:
+
+bashCopy code
+pip install openpyxl django-bootstrap4
+
+Add bootstrap4 and excelapp to your INSTALLED_APPS in settings.py:
+
+pythonCopy code
+INSTALLED_APPS = [
+# ...
+'bootstrap4',
+'excelapp',
+]
+
+Step 3: Create Models and Forms
+models.py:
+
+pythonCopy code
+from django.db import models
+
+class ExcelFile(models.Model):
+file = models.FileField(upload_to='excel/')
+uploaded_at = models.DateTimeField(auto_now_add=True)
+
+forms.py:
+
+pythonCopy code
+from django import forms
+from .models import ExcelFile
+
+class ExcelFileForm(forms.ModelForm):
+class Meta:
+model = ExcelFile
+fields = ['file']
+
+Step 4: Create Views
+views.py:
+
+pythonCopy code
+import openpyxl
+from django.shortcuts import render, redirect
+from .forms import ExcelFileForm
+from .models import ExcelFile
+
+def upload_file(request):
+if request.method == 'POST':
+form = ExcelFileForm(request.POST, request.FILES)
+if form.is_valid():
+form.save()
+return redirect('process_file')
+else:
+form = ExcelFileForm()
+return render(request, 'excelapp/upload.html', {'form': form})
+
+def process_file(request):
+if request.method == 'POST':
+column_name = request.POST.get('column_name')
+file = ExcelFile.objects.latest('uploaded_at')
+wb = openpyxl.load_workbook(file.file.path)
+ws = wb.active
+
+# Highlight cells with duplicate values in the specified column
+col_idx = None
+for idx, cell in enumerate(ws[1]):
+if cell.value == column_name:
+col_idx = idx + 1
+break
+
+if col_idx:
+values = {}
+for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
+cell = row[0]
+if cell.value in values:
+cell.fill = openpyxl.styles.PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+values[cell.value].fill = openpyxl.styles.PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+else:
+values[cell.value] = cell
+
+wb.save(file.file.path)
+
+return render(request, 'excelapp/process.html')
+
+Step 5: Create Templates
+upload.html:
+
+htmlCopy code
+{% load bootstrap4 %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Upload Excel File</title>
+{% bootstrap_css %}
+</head>
+<body>
+{% include 'navbar.html' %}
+<div class="container">
+<h1>Upload Excel File</h1>
+<form method="post" enctype="multipart/form-data">
+{% csrf_token %}
+{% bootstrap_form form %}
+<button type="submit" class="btn btn-primary">Upload</button>
+</form>
+</div>
+{% bootstrap_javascript %}
+</body>
+</html>
+
+process.html:
+
+htmlCopy code
+{% load bootstrap4 %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Process Excel File</title>
+{% bootstrap_css %}
+</head>
+<body>
+{% include 'navbar.html' %}
+<div class="container">
+<h1>Process Excel File</h1>
+<form method="post">
+{% csrf_token %}
+<div class="form-group">
+<label for="column_name">Column Name:</label>
+<input type="text" class="form-control" id="column_name" name="column_name" required>
+</div>
+<button type="submit" class="btn btn-primary">Highlight Duplicates</button>
+</form>
+</div>
+{% bootstrap_javascript %}
+</body>
+</html>
+
+navbar.html:
+
+htmlCopy code
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+<a class="navbar-brand" href="#">ExcelApp</a>
+<div class="collapse navbar-collapse">
+<ul class="navbar-nav mr-auto">
+<li class="nav-item">
+<a class="nav-link" href="{% url 'upload_file' %}">Upload</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="{% url 'process_file' %}">Process</a>
+</li>
+</ul>
+</div>
+</nav>
+
+Step 6: URL Configuration
+urls.py in excelapp:
+
+pythonCopy code
+from django.urls import path
+from . import views
+
+urlpatterns = [
+path('upload/', views.upload_file, name='upload_file'),
+path('process/', views.process_file, name='process_file'),
+]
+
+urls.py in myproject:
+
+pythonCopy code
+from django.contrib import admin
+from django.urls import include, path
+
+urlpatterns = [
+path('admin/', admin.site.urls),
+path('excelapp/', include('excelapp.urls')),
+]
+
+Step 7: Run the Server
+Run the development server to test your application:
+
+bashCopy code
+python manage.py runserver
