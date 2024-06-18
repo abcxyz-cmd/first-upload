@@ -1,0 +1,38 @@
+def exact_match_score(predicted_text, expected_text):
+    """
+    Calculate the exact match score as a percentage.
+
+    Args:
+        predicted_text (str): The generated text.
+        expected_text (str): The expected text.
+
+    Returns:
+        float: The exact match score as a percentage.
+    """
+    predicted_tokens = predicted_text.split()
+    expected_tokens = expected_text.split()
+
+    matching_tokens = sum(1 for p, e in zip(predicted_tokens, expected_tokens) if p == e)
+
+    accuracy = (matching_tokens / max(len(predicted_tokens), len(expected_tokens))) * 100.0
+
+    return accuracy
+
+# Example usage:
+predicted_text = "The quick brown fox jumps over the lazy dog."
+expected_text = "The quick brown fox jumps over the lazy dog."
+
+exact_match_percentage = exact_match_score(predicted_text, expected_text)
+print(f"Exact match score: {exact_match_percentage:.2f}%")
+
+predicted_text = "The quick brown fox jumps over the lazy cat."
+expected_text = "The quick brown fox jumps over the lazy dog."
+
+exact_match_percentage = exact_match_score(predicted_text, expected_text)
+print(f"Exact match score: {exact_match_percentage:.2f}%")
+
+predicted_text = "The quick brown fox jumps over dog."
+expected_text = "The quick brown fox jumps over the lazy dog."
+
+exact_match_percentage = exact_match_score(predicted_text, expected_text)
+print(f"Exact match score: {exact_match_percentage:.2f}%")
