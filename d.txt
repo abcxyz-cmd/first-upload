@@ -75,8 +75,7 @@ def convert_ifmatch(aion_text):
     blaze_code.append('}')
 
     # Write the output to a file
-    with open('output.txt', 'w') as f:
-        f.write('\n'.join(blaze_code))
+   
 
     # Print the Blaze code for debugging purposes
     for line in blaze_code:
@@ -101,4 +100,3 @@ END
 """
 
 convert_ifmatch(aion_text)
-          
