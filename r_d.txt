@@ -1,0 +1,113 @@
+import re
+
+def convert_ifmatch(aion_text):
+    # Split input text into lines and strip leading/trailing whitespace
+    lines = [line.strip() for line in aion_text.strip().split('\n') if line.strip()]
+    
+    # Initialize variables
+    class_conditions = {}
+    action = None
+    current_class = None
+    rule_name = None
+    
+    # Regex patterns
+    class_pattern = r'^(\w+)\s*with\s*(.*)'
+    condition_pattern = r'([\w.]+)\s*(=|>|<|!=|>=|<=)\s*(.+)'
+    action_pattern = r'^then\s*SEND\(CREATE_INST\s*TO\s*CLASS\(OUTPUT\)\s*WITH\s*(.*)\s*END'
+    
+    # Parse each line
+    for line in lines:
+        if line.startswith('ifmatch'):
+            continue  # Skip lines starting with 'ifmatch'
+        elif match := re.match(class_pattern, line):
+            # Parse class and conditions
+            current_class = match.group(1).strip()
+            conditions = [match.group(2).strip()]  # Start a list of conditions
+            class_conditions[current_class] = conditions
+        elif match := re.match(action_pattern, line):
+            action = match.group(1)  # Capture the action statement
+        elif current_class:  # Handle multi-line conditions or continuation lines
+            # Add line to the current conditions
+            class_conditions[current_class].append(line.strip())
+    
+    blaze_code = []
+    
+    # Process conditions for each class
+    for class_name, conditions in class_conditions.items():
+        blaze_conditions = []
+        
+        condition_text = ' '.join(conditions)
+        
+        # Handle parentheses
+        condition_text = re.sub(r'\(|\)', '', condition_text)
+        
+        # Split conditions by 'and' and 'or', considering multi-line conditions
+        conds = re.split(r'\s+(and|or)\s+', condition_text, flags=re.IGNORECASE)
+        
+        for i in range(0, len(conds), 2):
+            item = conds[i].strip()
+            if match := re.match(condition_pattern, item):
+                attr, op, value = match.groups()
+                attr = attr.strip()
+                value = value.strip()
+
+                # Adjust value if it's a string literal or boolean
+                if value.lower() in ['true', 'false']:
+                    value = value.lower()
+                elif value.startswith("'") and value.endswith("'"):
+                    value = f'"{value[1:-1]}"'
+                elif not value.startswith('"'):
+                    value = f'"{value}"'
+
+                # Create Blaze condition string
+                blaze_conditions.append(f'{attr} {op} {value}')
+            else:
+                print(f"Error: unknown condition format: {item}")
+            
+            # Add the logical operator (and/or) if it exists
+            if i + 1 < len(conds):
+                blaze_conditions.append(conds[i+1].lower())
+        
+        # Join all conditions
+        blaze_conditions = ' '.join(blaze_conditions)
+        blaze_code.append(f'if ({blaze_conditions}) then {{')
+
+    # Process the action statement
+    if action:
+        action_parts = action.split(',')
+        rule_name = next((part.strip().strip("'") for part in action_parts if part.strip().startswith("'CM")), None)
+        
+        blaze_code.append(f'    assignResponse(policy, household, responseData, ruleData, "{rule_name}", vehicle).')
+    
+    # Add additional comment
+    blaze_code.append('    // ADD \'71\' TO VEH.CANCEL_RSN_CD_LIST need clarification')
+    blaze_code.append('}')
+
+    # Write the output to a file
+    with open('output.txt', 'w') as f:
+        f.write('\n'.join(blaze_code))
+
+    # Print the Blaze code for debugging purposes
+    for line in blaze_code:
+        print(line)
+
+# Example input to test the function
+aion_text = """
+ifmatch
+Veh with 
+(Make_code = '102' and 
+Model_code = '694')  or 
+(Make_code = '103' and 
+Model_code = '695')
+
+plcy with
+lylty_acc_frgv_ind = 'Y' and
+tot_chrgble_acc_cnt > 0
+
+then SEND(CREATE_INST TO CLASS(OUTPUT) WITH
+policy_number, '000000000', '000000000', '23',
+'CMCARE9100', 'ALL')
+END
+"""
+
+convert_ifmatch(aion_text)
